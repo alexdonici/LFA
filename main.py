@@ -1,87 +1,110 @@
-###########################
-##########TEMA 1###########
-###########################
-def run_dfa(dfa, input_string):
-    
-    stare_curenta = dfa['stare_initiala'] #### seteaza starea curenta la starea initiala a DFA-ului ###
-     
- 
-    for simbol in input_string:
-        
-        if simbol not in dfa['alfabet']:   ### verifica daca simbolul nu se afla in alfabetul DFA-ului ###
-            return False
-        
-        
-        stare_curenta = dfa['tranzitii'].get((stare_curenta, simbol), None)     ### obtine urmatoarea stare pe baza starii curente i a simbolului ###
-        
-        ### Verifică dacă nu există o tranziție definită pentru perechea (stare_curenta, simbol)###
-        if stare_curenta is None:
-            return False
-    
-    ### Verifică dacă starea curentă se află în mulțimea stărilor finale ###
-    return stare_curenta in dfa['stari_finale']
+############################
+####### MINIMAL DFA ########
+############################
+import random
 
 
-def read_file(nume_fisier):
-    dfa = {}
-    with open(nume_fisier, 'r') as f:
-        tranzitii = {}
-        stari_finale = set()
-        linii = f.readlines()
-        
-        ### Parcurge fiecare linie din fișier ###
-        for linie in linii:
-            parti = linie.strip().split()
-            
-            ### Verifică dacă linia are 3 componente (stare, simbol, stare_urmatoare) - reprezentând o tranziție ###
-            if len(parti) == 3:
-                stare, simbol, stare_urmatoare = parti
-                
-                ### Adaugă tranziția în dicționarul de tranzitii ###
-                tranzitii[(stare, simbol)] = stare_urmatoare
-            
-            ### Verifică dacă linia este ultima - reprezentând stările finale ###
-            elif linie == linii[-1]:
-                for parte in parti:
-                    # Adaugă fiecare parte în mulțimea de stări finale
-                    stari_finale.add(parte)
-            
-            ### Altfel, afișează linia ca fiind ignorată ###
+def afisare(dictionar):
+    for linie in dictionar:
+        print(linie, dictionar[linie])
+    print()
+
+
+def afisare_partitie(partitii):
+    for partitie in partitii:
+        print(partitii.index(partitie))
+        for stare in partitie:
+            print(stare, partitie[stare])
+    print()
+
+
+def stari_aproape_egale(st1, st2):
+    ok = 1
+    for litera in alfabet:
+        if st1[litera][1] != st2[litera][1]:
+            ok = 0
+    return ok
+
+#####################################
+######## PARTITIE AUXILIARA #########
+#####################################
+def partitionare(lista_partitii):
+    partitie_noua = []
+    for partitie in lista_partitii:
+        for stare in partitie:
+            if len(partitie_noua) == 0 or len(partitie) == 1:  # dacă partitia e goală sau are o sg stare
+                partitie_noua.append({stare: partitie[stare]})
             else:
-                print(f"Linii ignorate: {linie.strip()}")
-        
-        alfabet = set()
-        stari = set()
-        
-        ### Extrage alfabetul și mulțimea de stări din dicționarul de tranzitii ###
-        for (stare, simbol) in tranzitii:
-            alfabet.add(simbol)
-            stari.add(stare)
-            stari.add(tranzitii[(stare, simbol)])
-        
-        ### Setează starea inițială ca fiind "q" + cel mai mic element din mulțimea de stări ###
-        stare_initiala = "q" + min([x[1] for x in stari])
-        
-        ### Construiește DFA-ul folosind informațiile extrase ###
-        dfa['alfabet'] = alfabet
-        dfa['stari'] = stari
-        dfa['stare_initiala'] = stare_initiala
-        dfa['stari_finale'] = stari_finale
-        dfa['tranzitii'] = tranzitii
-        
-    return dfa
+                for x in partitie_noua:
+                    if stari_aproape_egale(partitie[stare], x[random.choice(list(x.keys()))]):
+                        x[stare] = partitie[stare]
+                        break
+                else:
+                    partitie_noua.append({stare: partitie[stare]})
+    return partitie_noua
+
+#################################
+### RECONSTRUIREA PARTITIILOR ### -impartim starile DFA-ului in functie de echivalenta lor
+#################################
+def reconstruct(partitii):
+    for partitie in partitii:
+        for stare in partitie:
+            for litera in partitie[stare]:
+                for partitie2 in partitii:
+                    if partitie[stare][litera][0] in partitie2:
+                        partitie[stare][litera][1] = partitii.index(partitie2)
 
 
-###############################
-######## MAIN PROGRAM #########
-###############################
+#################################
+########## RANDOM.TXT ###########
+#################################
+with open("random.txt") as f:
+    alfabet = f.readline().strip().split()  # Citirea alfabetului
+    finale = f.readline().strip().split()  # Citirea starilor finale
+    tranzitii = f.readline().strip().split()  # Citirea tranzitiilor
+    dictionar_tranzitii = {}
+    for stare in tranzitii:
+        dictionar_tranzitii[stare] = {}
+    for linie in f:
+        tranz = linie.strip().split()
+        dictionar_tranzitii[tranz[0]][tranz[1]] = [tranz[2], None]
 
 
-dfa = read_file('input.txt')
-input_string = input("Input: ")
 
-### Verifică dacă șirul de intrare este acceptat de DFA și afișează rezultatul corespunzător ###
-if run_dfa(dfa, input_string):
-    print("Acceptat")
-else:
-    print("Respins")
+
+partitii = []
+A = {}
+B = {}
+for stare in dictionar_tranzitii:
+    if stare in finale:
+        B[stare] = dictionar_tranzitii[stare]
+    else:
+        A[stare] = dictionar_tranzitii[stare]
+partitii.append(A)  # Adăugarea primei partiții A
+partitii.append(B)  # Adăugarea celei de-a doua partiții B
+reconstruct(partitii)
+
+
+
+
+partitie_aux = partitionare(partitii)  # Crearea primei partiții auxiliare
+reconstruct(partitie_aux)
+
+
+
+
+while partitie_aux != partitii:
+    partitii = partitionare(partitii)  # Actualizarea partițiilor
+    reconstruct(partitii)
+
+    partitie_aux = partitionare(partitie_aux)  # Crearea unei noi partiții auxiliare
+    reconstruct(partitie_aux)
+
+
+#######################
+####### AFISARE #######
+#######################
+
+
+print("Partitii finale după minimizare:")
+afisare_partitie(partitii)  # Afișarea partițiilor finale
